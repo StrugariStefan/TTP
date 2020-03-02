@@ -1,7 +1,8 @@
 from reader import get_problem_instances, ProblemInstance
 from itertools import permutations
-from math import factorial
+from math import factorial, pow
 from typing import Callable
+from functools import reduce
 
 def can_item_be_stolen_for_city(city) :
     pass
@@ -9,7 +10,7 @@ def can_item_be_stolen_for_city(city) :
 def get_weight_for_city(city_index, city_traversal, items_decision_vector) :
     pass
 
-def permutations(n: int) -> (Callable[[int], list], Callable[[list], int]) :
+def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int]) :
     if n < 1 :
         raise Exception('Invalid Permutation Length')
 
@@ -22,7 +23,7 @@ def permutations(n: int) -> (Callable[[int], list], Callable[[list], int]) :
         
         m = k
 
-        for i in range(n):
+        for i in range(n) :
             ind = m % (n - i)
             m = m // (n - i)
             permutation[i] = elements[ind]
@@ -33,7 +34,7 @@ def permutations(n: int) -> (Callable[[int], list], Callable[[list], int]) :
         return permutation
 
     def permutation_to_integer(permutation: list) -> int :
-        if len(permutation) is not n + 1:
+        if len(permutation) is not n + 1 :
             raise Exception('Invalid permutation')
 
         permutation.pop(0)
@@ -57,6 +58,34 @@ def permutations(n: int) -> (Callable[[int], list], Callable[[list], int]) :
 
     return integer_to_permutation, permutation_to_integer
 
+def items_values(n: int) -> (Callable[[int], list], Callable[[list], int]) :
+    if n < 1 :
+        raise Exception('Invalid Length')
+
+    def integer_to_value_vector(k: int) -> list :
+        if k >= 2 ** n :
+            raise Exception('Value does not exist')
+
+        value_vector = [False for _ in range(n)]
+        for i in reversed(range(n)) :
+            value_vector[i] = k % 2 == 1
+            k = k // 2
+
+        return value_vector
+
+    def value_vector_to_integer(value_vector: list) -> int :
+        if len(value_vector) is not n :
+            raise Exception('Invalid value vector') 
+        
+        k = 0
+        for i in range(n) :
+            if value_vector[n - i - 1] :
+                k += 2 ** i
+
+        return k
+
+    return integer_to_value_vector, value_vector_to_integer
+            
         
 
 class TTP :
@@ -85,10 +114,16 @@ if __name__ == '__main__':
     instaces = get_problem_instances('input_example.json')
     print (instaces)
 
-    encoder, decoder = permutations(3)
+    encoder, decoder = city_traversal(3)
 
     for i in range(factorial(3)) :
         perm = encoder(i)
         print (perm)
         print (decoder(perm))
+
+    encoder2, decoder2 = items_values(3)
+    for i in range(2 ** 3) :
+        val_vec = encoder2(i)
+        print (val_vec)
+        print (decoder2(val_vec))
 
