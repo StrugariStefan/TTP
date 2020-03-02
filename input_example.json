@@ -1,0 +1,36 @@
+[
+    {
+        "capacity" : 5,
+        "no_cities" : 4,
+        "distances" : [
+            1,
+            2,
+            5,
+            1,
+            2,
+            3
+        ],
+        "values" : [
+            1,
+            2,
+            3
+        ]
+    },
+    {
+        "capacity" : 5,
+        "no_cities" : 4,
+        "distances" : [
+            1,
+            2,
+            5,
+            1,
+            2,
+            3
+        ],
+        "values" : [
+            1,
+            2,
+            3
+        ]
+    }
+]
