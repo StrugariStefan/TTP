@@ -1,7 +1,8 @@
 [
     {
-        "capacity" : 5,
+        "capacity" : 10,
         "no_cities" : 4,
+        "no_items" : 5,
         "distances" : [
             1,
             2,
@@ -13,12 +14,31 @@
         "values" : [
             1,
             2,
-            3
+            3,
+            4,
+            5
+        ],
+        "weights" : [
+            1,
+            2,
+            3,
+            4,
+            5
+        ],
+        "v_min" : 0.2,
+        "v_max" : 1,
+        "item_city_assignment": [
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 1]
         ]
     },
     {
-        "capacity" : 5,
+        "capacity" : 10,
         "no_cities" : 4,
+        "no_items" : 5,
         "distances" : [
             1,
             2,
@@ -30,7 +50,25 @@
         "values" : [
             1,
             2,
-            3
+            3,
+            4,
+            5
+        ],
+        "weights" : [
+            1,
+            2,
+            1,
+            1,
+            1
+        ],
+        "v_min" : 0.2,
+        "v_max" : 1,
+        "item_city_assignment": [
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 1]
         ]
     }
 ]
