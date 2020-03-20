@@ -104,10 +104,22 @@ def get_objective_functions(instance: ProblemInstance) :
         if len(instance.values) != len(value_vector) :
             raise Exception('Incompatible values with value vector length')
 
-        return reduce(lambda cumulated, current : cumulated + (current[1] if value_vector[current[0]] else 0), enumerate(instance.values), 0)
+        if get_weights(value_vector) > instance.capacity:
+            return 0
+
+        return - reduce(lambda cumulated, current : cumulated + (current[1] if value_vector[current[0]] else 0), enumerate(instance.values), 0)
 
     def traveling_salesman_objective(permutation: list, value_vector: list) -> float :
         n = instance.no_cities
+
+        # print ('-----------')
+        # print (get_weights(value_vector))
+        # print (instance.capacity)
+        # print (sum(instance.distances))
+        # print (instance.v_min)
+
+        if get_weights(value_vector) > instance.capacity:
+            return sum(instance.distances) / instance.v_min
 
         def velocity(quantity: int) -> float :
             return instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min)
@@ -138,6 +150,10 @@ def get_objective_functions(instance: ProblemInstance) :
 
     return knapsack_objective, traveling_salesman_objective, get_weights, distances, assignments
 
+def NSGA_II(instance: ProblemInstance) :
+    ko, tso, w, d, a = get_objective_functions(instance)
+    
+
 
 
 def multi_objective_genetic_algorithm(instance: ProblemInstance) :
@@ -159,9 +175,14 @@ if __name__ == '__main__':
                 perm = encoder(i)
                 val_vec = encoder2(j)
                 
-                print (perm)
-                print (val_vec)
-                print (tso(perm, val_vec))
+                tso(perm, val_vec)
+                ko(val_vec)
+                # print ('--------------')
+                # print (perm)
+                # print (val_vec)
+                # print (tso(perm, val_vec))
+                # print (ko(val_vec))
+
 
         # print (dist)
         # print (ica)

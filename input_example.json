@@ -1,6 +1,6 @@
 [
     {
-        "capacity" : 10,
+        "capacity" : 1,
         "no_cities" : 4,
         "no_items" : 5,
         "distances" : [
