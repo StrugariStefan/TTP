@@ -138,20 +138,28 @@ def get_objective_functions(instance: ProblemInstance) :
             return sum(instance.distances) / instance.v_min
 
         def velocity(quantity: int) -> float :
+            # print ('velocity')
+            # print (quantity)
+            # print (instance.capacity)
+            # print (instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min))
             return instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min)
 
         def get_weights_until_current_city(partial_permutation: list) -> int :
             i = len(partial_permutation)
             total_weight = 0
+            # print ('Permutation')
+            # print (partial_permutation)
             for k in range(i) :
                 for j in range(m) :
                     total_weight += value_vector[j] * instance.weights[j] * assignments.item((j, partial_permutation[k]))
+                    # print ('Weight:' + str(total_weight))
 
             return total_weight
 
         distance_cost = 0
         for i in range(n - 1) :
-            distance_cost += distances[permutation[i], permutation[i + 1]] / velocity(get_weights_until_current_city(permutation[:i]))
+            distance_cost += distances[permutation[i], permutation[i + 1]] / velocity(get_weights_until_current_city(permutation[:i+1]))
+            # print (distance_cost)
 
         distance_cost += distances[permutation[n - 1], permutation[0]] / velocity(get_weights_until_current_city(permutation))
 
