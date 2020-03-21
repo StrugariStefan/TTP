@@ -132,6 +132,7 @@ def get_objective_functions(instance: ProblemInstance) :
 
     def traveling_salesman_objective(permutation: list, value_vector: list) -> float :
         n = instance.no_cities
+        m = instance.no_items
 
         if get_weights(value_vector) > instance.capacity:
             return sum(instance.distances) / instance.v_min
@@ -143,7 +144,7 @@ def get_objective_functions(instance: ProblemInstance) :
             i = len(partial_permutation)
             total_weight = 0
             for k in range(i) :
-                for j in range(n) :
+                for j in range(m) :
                     total_weight += value_vector[j] * instance.weights[j] * assignments.item((j, partial_permutation[k]))
 
             return total_weight
@@ -154,7 +155,7 @@ def get_objective_functions(instance: ProblemInstance) :
 
         distance_cost += distances[permutation[n - 1], permutation[0]] / velocity(get_weights_until_current_city(permutation))
 
-        return distance_cost
+        return round(distance_cost, 2)
 
     def get_weights(value_vector: list) -> int :
         if len(instance.weights) != len(value_vector) :
@@ -231,7 +232,7 @@ def NSGA_II(instance: ProblemInstance) :
 
         return offspring
 
-    size = int(5e+1)
+    size = int(ceil(log2(factorial(n - 1) * 2 ** m)) * 2)
     population = get_random_population(size, n, m)
     offspring = apply_operators(population, crossover, mutation)
 
@@ -330,6 +331,7 @@ def NSGA_II(instance: ProblemInstance) :
     q = offspring
 
     while t < 10:
+        # print ('Epoch:' + str(t))
         p = set(p)
         q = set(q)
         r = list(p.union(q))
@@ -352,43 +354,10 @@ def NSGA_II(instance: ProblemInstance) :
 
     return p
 
-def multi_objective_genetic_algorithm(instance: ProblemInstance) :
-    pass
-
 if __name__ == '__main__':
-    print ('Deserialization started')
     instances = get_problem_instances('input_example.json')
 
     for instance in instances[:1] :
-
         p = NSGA_II(instance)
-
-        print (p)
-        print (len(p))
-        # encoder, decoder = city_traversal(instance.no_cities - 1)
-        # encoder2, decoder2 = items_values(instance.no_items)
-
-        # ko, tso, gw, dist, ica = get_objective_functions(instance)
-
-        # for i in range(factorial(instance.no_cities - 1)) :
-        #     for j in range(2 ** instance.no_items) :
-        #         perm = encoder(i)
-        #         val_vec = encoder2(j)
-                
-        #         tso(perm, val_vec)
-        #         ko(val_vec)
-                # print ('--------------')
-                # print (perm)
-                # print (val_vec)
-                # print (tso(perm, val_vec))
-                # print (ko(val_vec))
-
-
-        # print (dist)
-        # print (ica)
-
-        # for i in range(2 ** instance.no_items) :
-        #     print (val_vec)
-        #     print (ko(val_vec))
 
 
