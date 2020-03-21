@@ -13,8 +13,7 @@ def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Cal
     no_of_bits = ceil(log2(factorial(n)))
 
     def integer_to_boolean_vector(k: int) -> list :
-        if k >= factorial(n) :
-            raise Exception('This does not reprezint a valid permutation')
+        k %= factorial(n)
 
         boolean_vector = [False for _ in range(no_of_bits)]
         for i in reversed(range(no_of_bits)) :
@@ -35,8 +34,7 @@ def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Cal
         return k
 
     def integer_to_permutation(k: int) -> list:
-        if k >= factorial(n) :
-            raise Exception('Permutation does not exist')
+        k %= factorial(n)
 
         permutation = [0 for _ in range(n)]
         elements = [i for i in range(n)]
@@ -135,12 +133,6 @@ def get_objective_functions(instance: ProblemInstance) :
     def traveling_salesman_objective(permutation: list, value_vector: list) -> float :
         n = instance.no_cities
 
-        # print ('-----------')
-        # print (get_weights(value_vector))
-        # print (instance.capacity)
-        # print (sum(instance.distances))
-        # print (instance.v_min)
-
         if get_weights(value_vector) > instance.capacity:
             return sum(instance.distances) / instance.v_min
 
@@ -149,7 +141,6 @@ def get_objective_functions(instance: ProblemInstance) :
 
         def get_weights_until_current_city(partial_permutation: list) -> int :
             i = len(partial_permutation)
-            # print (partial_permutation)
             total_weight = 0
             for k in range(i) :
                 for j in range(n) :
@@ -209,64 +200,157 @@ def mutation(individual: list, mutation_rate: float) -> list :
     
     return mutated_individual
 
-def apply_operators(population: list, crossover: Callable[[tuple], tuple], mutation: Callable[[list], list]) -> list :
-    n = len(population)
-    offspring = []
-    
-    np.random.shuffle(population)
-
-    for index in range(0, n, 2) :
-        o1, o2 = crossover((population[index], population[index + 1]))
-        offspring.append(o1)
-        offspring.append(o2)
-
-    return offspring
-
-
 def NSGA_II(instance: ProblemInstance) :
     n = instance.no_cities
     m = instance.no_items
 
     ko, tso, w, d, a = get_objective_functions(instance)
-    dist_encoder, dist_decoder, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
-    item_encoder, item_decoder = items_values(m)
+    int_to_perm, perm_to_int, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
+    int_to_decision_vector, decision_vector_to_int = items_values(m)
+
+    inf_tso = sum(instance.distances) / instance.v_min
+    inf_ko = 0
+    
+    def apply_operators(population: list, crossover: Callable[[tuple], tuple], mutation: Callable[[list], list]) -> list :
+        encoded_population = list(map(lambda element: dist_into_boolean_vector(element[0]) + int_to_decision_vector(element[1]), population))
+
+        k = len(encoded_population)
+        rate = 1e-1
+        encoded_offspring = []
+        
+        np.random.shuffle(encoded_population)
+
+        for index in range(0, k, 2) :
+            o1, o2 = crossover((encoded_population[index], encoded_population[index + 1]))
+            o1 = mutation(o1, rate)
+            o2 = mutation(o2, rate)
+            encoded_offspring.append(o1)
+            encoded_offspring.append(o2)
+
+        offspring = list(map(lambda element: (boolean_vector_to_dist(element[:n - 1]), decision_vector_to_int(element[n - 1:])), encoded_offspring))
+
+        return offspring
 
     size = int(5e+1)
+    population = get_random_population(size, n, m)
+    offspring = apply_operators(population, crossover, mutation)
 
-    p = get_random_population(size, n, m)
+    def get_objective_limits(population: list) -> tuple :
+        ztso = list(map(lambda s: tso(int_to_perm(s[0]), int_to_decision_vector(s[1])), population))
+        zko = list(map(lambda  s: ko(int_to_decision_vector(s[1])), population))
 
-    encoded_population = list(map(lambda element: dist_into_boolean_vector(element[0]) + item_encoder(element[1]), p))
-    encoded_offspring = apply_operators(encoded_population, crossover, mutation)
+        max_tso = max(ztso)
+        min_tso = min(ztso)
 
-    print (encoded_offspring[0])
+        max_ko = max(zko)
+        min_ko = min(zko)            
+
+        return (max_tso, min_tso, max_ko, min_ko)
+
+    def compute_crowding_distance(pareto_front: set) -> dict :
+        tso_sorted_solutions = list(map(lambda s: (s, tso(int_to_perm(s[0]), int_to_decision_vector(s[1]))), pareto_front.copy())) 
+        tso_sorted_solutions.sort(key = lambda so : so[1])
+
+        ko_sorted_solutions = list(map(lambda s : (s, ko(int_to_decision_vector(s[1]))), pareto_front.copy()))
+        ko_sorted_solutions.sort(key = lambda so : so[1])
+            
+        cd_tso = [inf_tso for _ in tso_sorted_solutions]
+        cd_ko = [inf_ko for _ in ko_sorted_solutions]
+
+        l = len(cd_tso)
+        cd = { p : 0.0 for p in pareto_front }
+
+        cd[ko_sorted_solutions[0][0]] += cd_ko[0]
+        cd[tso_sorted_solutions[0][0]] += cd_tso[0]
+        cd[ko_sorted_solutions[l - 1][0]] += cd_ko[l - 1]
+        cd[tso_sorted_solutions[l - 1][0]] += cd_tso[l - 1]
+
+        for i in range(1, l - 1) :
+            cd_ko[i] = (ko_sorted_solutions[i + 1][1] - ko_sorted_solutions[i - 1][1]) / (ko_max - ko_min)
+            cd_tso[i] = (tso_sorted_solutions[i + 1][1] - tso_sorted_solutions[i - 1][1]) / (tso_max - tso_min)
+
+            cd[tso_sorted_solutions[i][0]] += cd_tso[i]
+            cd[ko_sorted_solutions[i][0]] += cd_ko[i]
+
+        sorted_by_crowding_distance_pf = sorted(cd.keys(), key = lambda k : cd[k], reverse = True)
+
+        return sorted_by_crowding_distance_pf
+
+    def fast_non_dominated_sort(population: list) -> list :
+        def dominates(p: tuple, q: tuple) -> bool :
+            pr1 = int_to_perm(p[0])
+            pr2 = int_to_decision_vector(p[1])
+            qr1 = int_to_perm(q[0])
+            qr2 = int_to_decision_vector(q[1])
+
+            pz1 = tso(pr1, pr2)
+            pz2 = ko(pr2)
+            qz1 = tso(qr1, qr2)
+            qz2 = ko(qr2)
+
+            if pz1 <= qz1 and pz2 <= qz2 :
+                if pz1 < qz1 or pz2 < qz2 :
+                    return True
+            
+            return False
+
+        F1 = set()    
+        S = {}
+        n = {}
+
+        for p in population :
+            S[p] = set()
+            n[p] = 0
+            for q in population :
+                if dominates(p, q) :
+                    S[p].add(q)
+                elif dominates(q, p) :
+                    n[p] += 1
+            if n[p] == 0 :
+                F1.add(p)
+
+        i = 0
+        F = F1
+        pareto_fronts = []
+
+        while len(F) != 0 :
+            pareto_fronts.append(F.copy())
+            H = set()
+            for p in F :
+                for q in S[p] :
+                    n[q] -= 1
+                    if n[q] == 0 :
+                        H.add(q)
+            F = H
+
+        return pareto_fronts
+
     t = 0
+    p = population
+    q = offspring
+
     while t < 10:
+        p = set(p)
+        q = set(q)
+        r = list(p.union(q))
+
+        (tso_max, tso_min, ko_max, ko_min) = get_objective_limits(r)
+        ordered_pareto_fronts = fast_non_dominated_sort(r)
+        p = set()
+
+        for pf in ordered_pareto_fronts :
+            if len(p) + len(pf) <= size :
+                p |= pf
+            else :
+                sorted_by_crowding_distance_pf = compute_crowding_distance(pf)
+
+                p |= set(sorted_by_crowding_distance_pf[: size - len(p)])
+                break
+
+        q = apply_operators(list(p), crossover, mutation)
         t += 1
-    # for e in p:
-    #     break
 
-    # integer = e[1]
-    # print (integer)
-    # value_vector = item_encoder(integer)
-    # print (value_vector)
-    # new_integer = item_decoder(value_vector)
-    # print (new_integer)
-
-    # o1, o2 = crossover((value_vector, item_encoder(21)))
-    # print (o1)
-    # print (o2)
-
-    # mi = mutation(value_vector, 0.5)
-    # print (mi)
-
-    # integer = e[0]
-    # print (integer)
-    # boolean_vector = dist_into_boolean_vector(integer)
-    # print (boolean_vector)
-    # decoded_integer = boolean_vector_to_dist(boolean_vector)
-    # print (decoded_integer)
-
-
+    return p
 
 def multi_objective_genetic_algorithm(instance: ProblemInstance) :
     pass
@@ -275,9 +359,12 @@ if __name__ == '__main__':
     print ('Deserialization started')
     instances = get_problem_instances('input_example.json')
 
-    for instance in instances :
+    for instance in instances[:1] :
 
-        NSGA_II(instance)
+        p = NSGA_II(instance)
+
+        print (p)
+        print (len(p))
         # encoder, decoder = city_traversal(instance.no_cities - 1)
         # encoder2, decoder2 = items_values(instance.no_items)
 
