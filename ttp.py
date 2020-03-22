@@ -420,12 +420,11 @@ def NSGA_II(instance: Problem) :
         return pareto_fronts
 
     t = 0
-    T_MAX = 5
+    T_MAX = 3
     p = population
     q = offspring
 
     while t < T_MAX:
-        print ('Epoch:' + str(t))
         p = set(p)
         q = set(q)
         r = list(p.union(q))

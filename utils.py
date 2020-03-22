@@ -21,9 +21,9 @@ def plot(path_list: list) :
         ovdfs.append(ovdf)
     df = pd.concat(ovdfs)
 
-    display(df)
+    display(ovdf)
 
-    g = sns.FacetGrid(df,  row="Epoch", hue="ParetoFront")
+    g = sns.FacetGrid(df,  row="Epoch", hue="ParetoFront", height = 4.5, aspect = 1.7)
     g = (g.map(plt.scatter, "Time", "Profit", edgecolor="w").add_legend())
 
     plt.show()
