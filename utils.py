@@ -20,18 +20,18 @@ def plot(output_path: str) :
     sns.scatterplot(x = "Time", y = "Profit", hue = "ParetoFront", data = ovdf1[['Time', 'Profit', 'ParetoFront']])
     plt.show()
 
-def run_ndga(instance_path: str) -> str :
+def run_ndga(filename: str) -> str :
 
-    instance = read_txt_instance(instance_path)
+    instance = read_txt_instance('.\\resources\\' + filename + '.txt')
     population = NSGA_II(instance)
 
     n = instance.no_cities
     m = instance.no_items
 
-    ko, tso, w, d, a = get_objective_functions(instance)
+    ko, tso, w, d, a, get_assigned_items = get_objective_functions(instance)
 
     int_to_perm, perm_to_int, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
-    int_to_decision_vector, decision_vector_to_int = items_values(m)
+    int_to_decision_vector, decision_vector_to_int = items_values(instance.capacity, instance.items)
 
     decoded_population = list(map(lambda x : (int_to_perm(x[0]), int_to_decision_vector(x[1])), population))
     objective_values = list(map(lambda x: (tso(x[0], x[1]), -ko(x[1])), decoded_population))
@@ -48,7 +48,7 @@ def run_ndga(instance_path: str) -> str :
     ovdf['ParetoFront'] = is_in_pareto_front
     ovdf['Tour'] = decoded_population
 
-    instance_output = '.\\output\\' + 'test-example-n4' + '.pkl'
+    instance_output = '.\\output\\' + filename + '.pkl'
 
     if path.exists(instance_output) == False :
         ovdf.to_pickle(instance_output)

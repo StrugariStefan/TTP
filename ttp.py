@@ -6,6 +6,14 @@ from functools import reduce
 
 import numpy as np
 import random
+import time
+
+tso_solutions = {}
+ko_solutions = {}
+weights = {}
+profit = {}
+
+assigned_items = {}
 
 def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Callable[[int], list], Callable[[list], int]) :
     if n < 1 :
@@ -77,31 +85,68 @@ def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Cal
 
     return integer_to_permutation, permutation_to_integer, integer_to_boolean_vector, boolean_vector_to_integer
 
-def items_values(n: int) -> (Callable[[int], list], Callable[[list], int]) :
-    if n < 1 :
+def items_values(capacity: int, items: list) -> (Callable[[int], list], Callable[[list], int]) :
+    m = len(items)
+    
+    if m < 1 :
         raise Exception('Invalid Length')
 
-    def integer_to_value_vector(k: int) -> list :
-        if k >= 2 ** n :
-            raise Exception('Value does not exist')
+    memoized_combinations = {}
 
-        value_vector = [False for _ in range(n)]
-        for i in reversed(range(n)) :
-            value_vector[i] = k % 2 == 1
-            k = k // 2
+    def combinations(w: int, item_weight_list: tuple) -> list :
+        if (w, item_weight_list) not in memoized_combinations :
+            if len(item_weight_list) == 0 :
+                return [[]]
+            
+            x = item_weight_list[0]
+            xs = item_weight_list[1:]
+            if w >= x[1] :
+                result = [ [x] + ys for ys in combinations(w - x[1], xs)] + combinations(w, xs)
+            else : 
+                result = combinations(w, xs)
+            memoized_combinations[(w, item_weight_list)] = result
+        
+        return memoized_combinations[(w, item_weight_list)]
+
+    def get_profit_vector(item_combination: list) -> list :
+        profit_vector = [False for _ in range(m)]
+        for item_index in item_combination :
+            profit_vector[item_index] = True
+
+        return profit_vector
+
+    def get_combination(value_vector: list) -> list :
+        k = 0
+        for i in range(m) :
+            if value_vector[n - i - 1] :
+                k += 2 ** i
+
+        if k >= number_of_combinations :
+            k %= number_of_combinations
+
+        return valid_item_combinations[k]
+
+    valid_item_combinations = combinations(capacity, tuple(map(lambda x: (x[0], x[1][1]), enumerate(items))))
+    valid_item_combinations = list(map(lambda x: list(map(lambda y: y[0], x)), valid_item_combinations))
+
+    number_of_combinations = len(valid_item_combinations)
+
+    n = ceil(log2(number_of_combinations))
+    
+    def integer_to_value_vector(k: int) -> list :
+        k %= number_of_combinations
+        value_vector = get_profit_vector(valid_item_combinations[k])
 
         return value_vector
 
     def value_vector_to_integer(value_vector: list) -> int :
-        if len(value_vector) != n :
+        if len(value_vector) != m :
             raise Exception('Invalid value vector') 
         
-        k = 0
-        for i in range(n) :
-            if value_vector[n - i - 1] :
-                k += 2 ** i
+        combination = get_combination(value_vector)
+        integer_reprezentation = valid_item_combinations.index(combination)        
 
-        return k
+        return integer_reprezentation
 
     return integer_to_value_vector, value_vector_to_integer
 
@@ -114,57 +159,101 @@ def get_objective_functions(instance: Problem) :
         dist = ceil(sqrt((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2))
         return dist
 
-    def get_item(item_index: int) :
+    def get_item(item_index: int) -> tuple :
         return instance.items[item_index]
 
-    def isItemAssigned(item_index: int, node: int) :
+    def get_assigned_items(node: int) -> list :
+        global assigned_items
+
+        if node not in assigned_items :
+            assigned_items[node] = list(filter(lambda ex: ex[1][2] == node, enumerate(instance.items)))
+
+        return assigned_items[node]
+
+    def isItemAssigned(item_index: int, node: int) -> bool :
         return instance.items[item_index][2] == node
 
 
     def knapsack_objective(value_vector: list) -> int :
+        global profit
+        value_vector = tuple(value_vector[:])
+
         if len(instance.items) != len(value_vector) :
             raise Exception('Incompatible values with value vector length')
 
         if get_weights(value_vector) > instance.capacity:
             return 0
+        
+        if value_vector not in profit :
+            total_profit = - reduce(lambda cumulated, current : cumulated + (get_item(current[0])[0] if current[1] else 0), enumerate(value_vector), 0)
+            profit[value_vector] = total_profit
 
-        return - reduce(lambda cumulated, current : cumulated + (get_item(current[0])[0] if current[1] else 0), enumerate(value_vector), 0)
+        return profit[value_vector]
 
     def traveling_salesman_objective(permutation: list, value_vector: list) -> float :
         n = instance.no_cities
         m = instance.no_items
 
-        if get_weights(value_vector) > instance.capacity:
-            return float("inf")
+        global tso_solutions
 
-        def velocity(quantity: int) -> float :
-            return instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min)
+        permutation = tuple(permutation[:])
+        value_vector = tuple(value_vector[:])
 
-        def get_weights_until_current_city(partial_permutation: list) -> int :
-            i = len(partial_permutation)
-            total_weight = 0
-            for k in range(i) :
-                for j in range(m) :
-                    total_weight += value_vector[j] * get_item(j)[1] * isItemAssigned(j, partial_permutation[k])
+        if (permutation, value_vector) not in tso_solutions :
 
-            return total_weight
+            if get_weights(value_vector) > instance.capacity:
+                return float("inf")
 
-        distance_cost = 0
-        for i in range(n - 1) :
-            distance_cost += compare_nodes(permutation[i], permutation[i + 1]) / velocity(get_weights_until_current_city(permutation[:i+1]))
+            def velocity(quantity: int) -> float :
+                return instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min)
 
-        distance_cost += compare_nodes(permutation[n - 1], permutation[0]) / velocity(get_weights_until_current_city(permutation))
+            def get_weights_until_current_city(partial_permutation: list) -> int :
+                i = len(partial_permutation)
+                total_weight = 0
+                for k in range(i) :
+                    for j in range(m) :
+                        total_weight += value_vector[j] * get_item(j)[1] * isItemAssigned(j, partial_permutation[k])
 
+                return total_weight
 
-        return round(distance_cost, 2)
+            def get_cumulated_capacity(val_vec: list, perm: list) -> list :
+                s = 0
+                cummulated_capacity = []
+                for c in perm :
+                    items = get_assigned_items(c)
+                    for index, item in items :
+                        s += value_vector[index] * item[1]
+                    cummulated_capacity.append(s)
+                return cummulated_capacity
+
+            ccap = get_cumulated_capacity(value_vector, permutation)
+
+            distance_cost = 0
+            for i in range(n - 1) :
+                distance_cost += compare_nodes(permutation[i], permutation[i + 1]) / velocity(ccap[i])
+
+            distance_cost += compare_nodes(permutation[n - 1], permutation[0]) / velocity(ccap[n - 1])
+
+            tso_obj = round(distance_cost, 2)
+            tso_solutions[(permutation, value_vector)] = tso_obj
+
+        return tso_solutions[(permutation, value_vector)]
+        
 
     def get_weights(value_vector: list) -> int :
+        global weights
+        value_vector = tuple(value_vector[:])
+
         if len(instance.items) != len(value_vector) :
             raise Exception('Incompatible weights with value vector length')
 
-        return reduce(lambda cumulated, current : cumulated + (get_item(current[0])[1] if current[1] else 0), enumerate(value_vector), 0)
+        if value_vector not in weights :
+            total_weight = reduce(lambda cumulated, current : cumulated + (get_item(current[0])[1] if current[1] else 0), enumerate(value_vector), 0)
+            weights[value_vector] = total_weight
 
-    return knapsack_objective, traveling_salesman_objective, get_weights, compare_nodes, get_item
+        return weights[value_vector]
+
+    return knapsack_objective, traveling_salesman_objective, get_weights, compare_nodes, get_item, get_assigned_items
 
 def get_random_population(size: int, n: int, m: int) -> list :
     population = []
@@ -206,21 +295,20 @@ def NSGA_II(instance: Problem) :
     n = instance.no_cities
     m = instance.no_items
 
-    ko, tso, w, d, a = get_objective_functions(instance)
+    ko, tso, w, d, a, get_items_for_node = get_objective_functions(instance)
     int_to_perm, perm_to_int, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
-    int_to_decision_vector, decision_vector_to_int = items_values(m)
+    int_to_decision_vector, decision_vector_to_int = items_values(instance.capacity, instance.items)
 
     inf_tso = float("inf")
     inf_ko = 0
     
     def apply_operators(population: list, crossover: Callable[[tuple], tuple], mutation: Callable[[list], list]) -> list :
-        print ("Applying operators")
         encoded_population = list(map(lambda element: dist_into_boolean_vector(element[0]) + int_to_decision_vector(element[1]), population))
 
         ai = ceil(log2(factorial(n - 1)))
 
         k = len(encoded_population)
-        rate = 1e-1
+        rate = 1e-3
         encoded_offspring = []
         
         np.random.shuffle(encoded_population)
@@ -255,7 +343,6 @@ def NSGA_II(instance: Problem) :
         return (max_tso, min_tso, max_ko, min_ko)
 
     def compute_crowding_distance(pareto_front: set) -> dict :
-        print ("CDb")
         tso_sorted_solutions = list(map(lambda s: (s, tso(int_to_perm(s[0]), int_to_decision_vector(s[1]))), pareto_front.copy())) 
         tso_sorted_solutions.sort(key = lambda so : so[1])
 
@@ -281,7 +368,6 @@ def NSGA_II(instance: Problem) :
             cd[ko_sorted_solutions[i][0]] += cd_ko[i]
 
         sorted_by_crowding_distance_pf = sorted(cd.keys(), key = lambda k : cd[k], reverse = True)
-        print ('CDe')
 
         return sorted_by_crowding_distance_pf
 
@@ -307,7 +393,6 @@ def NSGA_II(instance: Problem) :
         S = {}
         n = {}
 
-        print ('F1')
         for p in population :
             S[p] = set()
             n[p] = 0
@@ -319,12 +404,10 @@ def NSGA_II(instance: Problem) :
             if n[p] == 0 :
                 F1.add(p)
 
-        i = 0
         F = F1
         pareto_fronts = []
 
         while len(F) != 0 :
-            print (i)
             pareto_fronts.append(F.copy())
             H = set()
             for p in F :
@@ -333,7 +416,6 @@ def NSGA_II(instance: Problem) :
                     if n[q] == 0 :
                         H.add(q)
             F = H
-            i += 1
 
         return pareto_fronts
 
@@ -349,7 +431,6 @@ def NSGA_II(instance: Problem) :
 
         (tso_max, tso_min, ko_max, ko_min) = get_objective_limits(r)
 
-        print (tso_max, tso_min, ko_max, ko_min)
         ordered_pareto_fronts = fast_non_dominated_sort(r)
         p = set()
 
@@ -370,17 +451,10 @@ def NSGA_II(instance: Problem) :
 from reader import read_txt_instance
 
 if __name__ == '__main__':
-    instances = get_problem_instances('input_example.json')
+    from utils import run_ndga, plot
 
-    pr = read_txt_instance('.\\resources\\test-example-n4.txt')
-
-    print (pr)
-    p = NSGA_II(pr)
-
-    print (p)
-
-    # for instance in instances[:1] :
-    #     p = NSGA_II(instance)
+    output_file = run_ndga('test-example-n4')
+    plot(output_file)
 
 
 
