@@ -362,10 +362,16 @@ def NSGA_II(instance: ProblemInstance) :
 
     return p
 
+from reader import read_txt_instance
+
 if __name__ == '__main__':
     instances = get_problem_instances('input_example.json')
 
-    for instance in instances[:1] :
-        p = NSGA_II(instance)
+    i = read_txt_instance('.\\resources\\test-example-n4.txt')
+
+    # for instance in instances[:1] :
+    #     p = NSGA_II(instance)
+
+
 
 
