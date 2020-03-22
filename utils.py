@@ -13,17 +13,25 @@ def dominates(x: tuple, y: tuple) -> bool :
     
     return False
 
-def plot(output_path: str) :
-    ovdf1 = pd.read_pickle(output_path)
-    display(ovdf1)
+def plot(path_list: list) :
+    ovdfs = []
+    for i, path in enumerate(path_list) :
+        ovdf = pd.read_pickle(path)
+        ovdf['Epoch'] = i
+        ovdfs.append(ovdf)
+    df = pd.concat(ovdfs)
 
-    sns.scatterplot(x = "Time", y = "Profit", hue = "ParetoFront", data = ovdf1[['Time', 'Profit', 'ParetoFront']])
+    display(df)
+
+    g = sns.FacetGrid(df,  row="Epoch", hue="ParetoFront")
+    g = (g.map(plt.scatter, "Time", "Profit", edgecolor="w").add_legend())
+
     plt.show()
 
-def run_ndga(filename: str) -> str :
+def run_ndga(filename: str) :
 
     instance = read_txt_instance('.\\resources\\' + filename + '.txt')
-    population = NSGA_II(instance)
+    population_generator = NSGA_II(instance)
 
     n = instance.no_cities
     m = instance.no_items
@@ -33,24 +41,25 @@ def run_ndga(filename: str) -> str :
     int_to_perm, perm_to_int, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
     int_to_decision_vector, decision_vector_to_int = items_values(instance.capacity, instance.items)
 
-    decoded_population = list(map(lambda x : (int_to_perm(x[0]), int_to_decision_vector(x[1])), population))
-    objective_values = list(map(lambda x: (tso(x[0], x[1]), -ko(x[1])), decoded_population))
+    for i, population in enumerate(list(population_generator)) :
+        decoded_population = list(map(lambda x : (int_to_perm(x[0]), int_to_decision_vector(x[1])), population))
+        objective_values = list(map(lambda x: (tso(x[0], x[1]), -ko(x[1])), decoded_population))
 
-    is_in_pareto_front = [True for _ in objective_values]
+        is_in_pareto_front = [True for _ in objective_values]
 
-    for ov1 in objective_values :
-        for index, ov2 in enumerate(objective_values) :
-            if dominates(ov1, ov2) :
-                is_in_pareto_front[index] = False
+        for ov1 in objective_values :
+            for index, ov2 in enumerate(objective_values) :
+                if dominates(ov1, ov2) :
+                    is_in_pareto_front[index] = False
 
-    ovdf = pd.DataFrame(objective_values, columns = ['Time', 'Profit'])
+        ovdf = pd.DataFrame(objective_values, columns = ['Time', 'Profit'])
 
-    ovdf['ParetoFront'] = is_in_pareto_front
-    ovdf['Tour'] = decoded_population
+        ovdf['ParetoFront'] = is_in_pareto_front
+        ovdf['Tour'] = decoded_population
 
-    instance_output = '.\\output\\' + filename + '.pkl'
+        instance_output = '.\\output\\' + filename + '-' + 'capacity' + str(instance.capacity) + '-' + 'epoch' + str(i) + '.pkl'
 
-    if path.exists(instance_output) == False :
-        ovdf.to_pickle(instance_output)
+        if path.exists(instance_output) == False :
+            ovdf.to_pickle(instance_output)
 
-    return instance_output
+        yield instance_output

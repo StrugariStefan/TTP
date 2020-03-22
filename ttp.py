@@ -324,7 +324,7 @@ def NSGA_II(instance: Problem) :
 
         return offspring
 
-    size = min(int(ceil(log2(factorial(n - 1) * 2 ** m)) * 2), 50)
+    size = min(int(ceil(log2(factorial(n - 1) * 2 ** m)) * 2), 500)
 
     print ('Population size: ' + str(size))
     population = get_random_population(size, n, m)
@@ -420,10 +420,11 @@ def NSGA_II(instance: Problem) :
         return pareto_fronts
 
     t = 0
+    T_MAX = 5
     p = population
     q = offspring
 
-    while t < 10:
+    while t < T_MAX:
         print ('Epoch:' + str(t))
         p = set(p)
         q = set(q)
@@ -444,17 +445,18 @@ def NSGA_II(instance: Problem) :
                 break
 
         q = apply_operators(list(p), crossover, mutation)
+        yield p
         t += 1
-
-    return p
 
 from reader import read_txt_instance
 
 if __name__ == '__main__':
     from utils import run_ndga, plot
 
-    output_file = run_ndga('test-example-n4')
-    plot(output_file)
+    # output_file_generator = run_ndga('test-example-n4')
+    output_file_generator = run_ndga('a20-n20')
+
+    plot(list(output_file_generator))
 
 
 
