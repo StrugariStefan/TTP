@@ -22,7 +22,20 @@ def get_problem_instances(json_file_path: str) -> list :
         d = json.load(f)
     return [object_decoder(obj) for obj in list(d)]
 
-def read_txt_instance(txt_file_path: str) -> ProblemInstance :
+class Problem :
+    def __init__(self, capacity: float, no_cities: int, no_items: int, coordinates: list, items: list, v_min: float, v_max: float) :
+        self.capacity = capacity
+        self.no_cities = no_cities
+        self.no_items = no_items
+        self.coordinates = coordinates
+        self.items = items
+        self.v_min = v_min
+        self.v_max = v_max
+
+    def __repr__(self) -> str :
+        return str(self.__dict__)
+
+def read_txt_instance(txt_file_path: str) -> Problem :
     f = open(txt_file_path, 'r') 
 
     count = 0
@@ -76,11 +89,5 @@ def read_txt_instance(txt_file_path: str) -> ProblemInstance :
 
                 items.append((p, w, am))
 
-    print (items)
-    print (coordinates)
-    print (numOfCities)
-    print (numOfItems)
-    print (capacity)
-    print (v_min)
-    print (v_max)
+    return Problem(capacity, numOfCities, numOfItems, coordinates, items, v_min, v_max)
             

@@ -1,6 +1,6 @@
-from reader import get_problem_instances, ProblemInstance
+from reader import get_problem_instances, ProblemInstance, Problem, read_txt_instance
 from itertools import permutations
-from math import factorial, pow, ceil, log2
+from math import factorial, pow, ceil, log2, sqrt
 from typing import Callable
 from functools import reduce
 
@@ -104,74 +104,66 @@ def items_values(n: int) -> (Callable[[int], list], Callable[[list], int]) :
 
     return integer_to_value_vector, value_vector_to_integer
 
-def get_objective_functions(instance: ProblemInstance) :
+def get_objective_functions(instance: Problem) :
 
-    def get_distances(instance: ProblemInstance) -> list :
-        n = instance.no_cities
-        k = 0
-        distances = [[0 for _ in range(n)] for _ in range(n)]
-        for i in range(0, n) :
-            for j in range(i + 1, n) :
-                distances[i][j] = instance.distances[k]
-                distances[j][i] = instance.distances[k]
-                k += 1
-        return np.array(distances)
+    def compare_nodes(n1: int, n2: int) -> list :
+        x = instance.coordinates[n1]
+        y = instance.coordinates[n2]
+        
+        dist = ceil(sqrt((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2))
+        return dist
 
-    distances = get_distances(instance)
-    assignments = np.array(instance.item_city_assignment)
+    def get_item(item_index: int) :
+        return instance.items[item_index]
+
+    def isItemAssigned(item_index: int, node: int) :
+        return instance.items[item_index][2] == node
 
 
     def knapsack_objective(value_vector: list) -> int :
-        if len(instance.values) != len(value_vector) :
+        if len(instance.items) != len(value_vector) :
             raise Exception('Incompatible values with value vector length')
 
         if get_weights(value_vector) > instance.capacity:
             return 0
 
-        return - reduce(lambda cumulated, current : cumulated + (current[1] if value_vector[current[0]] else 0), enumerate(instance.values), 0)
+        return - reduce(lambda cumulated, current : cumulated + (get_item(current[0])[0] if current[1] else 0), enumerate(value_vector), 0)
 
     def traveling_salesman_objective(permutation: list, value_vector: list) -> float :
         n = instance.no_cities
         m = instance.no_items
 
         if get_weights(value_vector) > instance.capacity:
-            return sum(instance.distances) / instance.v_min
+            return float("inf")
 
         def velocity(quantity: int) -> float :
-            # print ('velocity')
-            # print (quantity)
-            # print (instance.capacity)
-            # print (instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min))
             return instance.v_max - quantity / instance.capacity * (instance.v_max - instance.v_min)
 
         def get_weights_until_current_city(partial_permutation: list) -> int :
             i = len(partial_permutation)
             total_weight = 0
-            # print ('Permutation')
-            # print (partial_permutation)
             for k in range(i) :
                 for j in range(m) :
-                    total_weight += value_vector[j] * instance.weights[j] * assignments.item((j, partial_permutation[k]))
-                    # print ('Weight:' + str(total_weight))
+                    total_weight += value_vector[j] * get_item(j)[1] * isItemAssigned(j, partial_permutation[k])
 
             return total_weight
 
         distance_cost = 0
         for i in range(n - 1) :
-            distance_cost += distances[permutation[i], permutation[i + 1]] / velocity(get_weights_until_current_city(permutation[:i+1]))
-            # print (distance_cost)
+            distance_cost += compare_nodes(permutation[i], permutation[i + 1]) / velocity(get_weights_until_current_city(permutation[:i+1]))
 
-        distance_cost += distances[permutation[n - 1], permutation[0]] / velocity(get_weights_until_current_city(permutation))
+        distance_cost += compare_nodes(permutation[n - 1], permutation[0]) / velocity(get_weights_until_current_city(permutation))
+
 
         return round(distance_cost, 2)
 
     def get_weights(value_vector: list) -> int :
-        if len(instance.weights) != len(value_vector) :
+        if len(instance.items) != len(value_vector) :
             raise Exception('Incompatible weights with value vector length')
 
-        return reduce(lambda cumulated, current : cumulated + (current[1] if value_vector[current[0]] else 0), enumerate(instance.weights), 0)
+        return reduce(lambda cumulated, current : cumulated + (get_item(current[0])[1] if current[1] else 0), enumerate(value_vector), 0)
 
-    return knapsack_objective, traveling_salesman_objective, get_weights, distances, assignments
+    return knapsack_objective, traveling_salesman_objective, get_weights, compare_nodes, get_item
 
 def get_random_population(size: int, n: int, m: int) -> list :
     population = []
@@ -209,7 +201,7 @@ def mutation(individual: list, mutation_rate: float) -> list :
     
     return mutated_individual
 
-def NSGA_II(instance: ProblemInstance) :
+def NSGA_II(instance: Problem) :
     n = instance.no_cities
     m = instance.no_items
 
@@ -217,7 +209,7 @@ def NSGA_II(instance: ProblemInstance) :
     int_to_perm, perm_to_int, dist_into_boolean_vector, boolean_vector_to_dist = city_traversal(n - 1)
     int_to_decision_vector, decision_vector_to_int = items_values(m)
 
-    inf_tso = sum(instance.distances) / instance.v_min
+    inf_tso = float("inf")
     inf_ko = 0
     
     def apply_operators(population: list, crossover: Callable[[tuple], tuple], mutation: Callable[[list], list]) -> list :
@@ -367,7 +359,12 @@ from reader import read_txt_instance
 if __name__ == '__main__':
     instances = get_problem_instances('input_example.json')
 
-    i = read_txt_instance('.\\resources\\test-example-n4.txt')
+    pr = read_txt_instance('.\\resources\\test-example-n4.txt')
+
+    print (pr)
+    p = NSGA_II(pr)
+
+    print (p)
 
     # for instance in instances[:1] :
     #     p = NSGA_II(instance)
