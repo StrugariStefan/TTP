@@ -5,6 +5,7 @@ from typing import Callable
 from functools import reduce
 
 import numpy as np
+import random
 
 def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Callable[[int], list], Callable[[list], int]) :
     if n < 1 :
@@ -52,7 +53,7 @@ def city_traversal(n: int) -> (Callable[[int], list], Callable[[list], int], Cal
         return permutation
 
     def permutation_to_integer(permutation: list) -> int :
-        if len(permutation) is not n + 1 :
+        if len(permutation) != n + 1 :
             raise Exception('Invalid permutation')
 
         permutation.pop(0)
@@ -92,7 +93,7 @@ def items_values(n: int) -> (Callable[[int], list], Callable[[list], int]) :
         return value_vector
 
     def value_vector_to_integer(value_vector: list) -> int :
-        if len(value_vector) is not n :
+        if len(value_vector) != n :
             raise Exception('Invalid value vector') 
         
         k = 0
@@ -168,8 +169,8 @@ def get_objective_functions(instance: Problem) :
 def get_random_population(size: int, n: int, m: int) -> list :
     population = []
     for i in range(size) :
-        permutation_repr = np.random.randint(low = 0, high = factorial(n - 1), size = None)
-        value_vector_repr = np.random.randint(low = 0, high = 2 ** m, size = None)
+        permutation_repr = random.randrange(start = 0, stop = factorial(n - 1), step = 1)
+        value_vector_repr = random.randrange(start = 0, stop = 2 ** m, step = 1)
         population.append((permutation_repr, value_vector_repr))
 
     return population
@@ -213,7 +214,10 @@ def NSGA_II(instance: Problem) :
     inf_ko = 0
     
     def apply_operators(population: list, crossover: Callable[[tuple], tuple], mutation: Callable[[list], list]) -> list :
+        print ("Applying operators")
         encoded_population = list(map(lambda element: dist_into_boolean_vector(element[0]) + int_to_decision_vector(element[1]), population))
+
+        ai = ceil(log2(factorial(n - 1)))
 
         k = len(encoded_population)
         rate = 1e-1
@@ -228,11 +232,13 @@ def NSGA_II(instance: Problem) :
             encoded_offspring.append(o1)
             encoded_offspring.append(o2)
 
-        offspring = list(map(lambda element: (boolean_vector_to_dist(element[:n - 1]), decision_vector_to_int(element[n - 1:])), encoded_offspring))
+        offspring = list(map(lambda element: (boolean_vector_to_dist(element[:ai]), decision_vector_to_int(element[ai:])), encoded_offspring))
 
         return offspring
 
-    size = int(ceil(log2(factorial(n - 1) * 2 ** m)) * 2)
+    size = min(int(ceil(log2(factorial(n - 1) * 2 ** m)) * 2), 50)
+
+    print ('Population size: ' + str(size))
     population = get_random_population(size, n, m)
     offspring = apply_operators(population, crossover, mutation)
 
@@ -249,6 +255,7 @@ def NSGA_II(instance: Problem) :
         return (max_tso, min_tso, max_ko, min_ko)
 
     def compute_crowding_distance(pareto_front: set) -> dict :
+        print ("CDb")
         tso_sorted_solutions = list(map(lambda s: (s, tso(int_to_perm(s[0]), int_to_decision_vector(s[1]))), pareto_front.copy())) 
         tso_sorted_solutions.sort(key = lambda so : so[1])
 
@@ -274,6 +281,7 @@ def NSGA_II(instance: Problem) :
             cd[ko_sorted_solutions[i][0]] += cd_ko[i]
 
         sorted_by_crowding_distance_pf = sorted(cd.keys(), key = lambda k : cd[k], reverse = True)
+        print ('CDe')
 
         return sorted_by_crowding_distance_pf
 
@@ -299,6 +307,7 @@ def NSGA_II(instance: Problem) :
         S = {}
         n = {}
 
+        print ('F1')
         for p in population :
             S[p] = set()
             n[p] = 0
@@ -315,6 +324,7 @@ def NSGA_II(instance: Problem) :
         pareto_fronts = []
 
         while len(F) != 0 :
+            print (i)
             pareto_fronts.append(F.copy())
             H = set()
             for p in F :
@@ -323,6 +333,7 @@ def NSGA_II(instance: Problem) :
                     if n[q] == 0 :
                         H.add(q)
             F = H
+            i += 1
 
         return pareto_fronts
 
@@ -331,12 +342,14 @@ def NSGA_II(instance: Problem) :
     q = offspring
 
     while t < 10:
-        # print ('Epoch:' + str(t))
+        print ('Epoch:' + str(t))
         p = set(p)
         q = set(q)
         r = list(p.union(q))
 
         (tso_max, tso_min, ko_max, ko_min) = get_objective_limits(r)
+
+        print (tso_max, tso_min, ko_max, ko_min)
         ordered_pareto_fronts = fast_non_dominated_sort(r)
         p = set()
 
